@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.manager.ManagerDAO">
+
+	<select id="list" resultType="org.kdea.manager.ManagerVO">
+		select *
+		from
+		(
+		  select r.*,TRUNC((rownum-1)/5)+1 AS page ,(SELECT COUNT(*) FROM report) as totalRows 
+		  from
+		  (
+		    select *
+		    from report
+		  ) r 
+		)
+		where page=#{page}
+		ORDER BY num desc
+	</select>
+
+	<select id="desc" resultType="org.kdea.manager.ManagerVO">
+			  select *
+			  from report
+		      where num=#{num}
+	</select>
+
+	
+	<update id="delBoard" parameterType="org.kdea.manager.ManagerVO">
+		UPDATE report SET active=0, complete='처리완료' WHERE reportnum=#{num}
+	</update>
+	
+	<select id="getSearch" resultType="org.kdea.manager.ManagerVO">
+		SELECT * FROM board WHERE
+		<choose>
+			<when test="conten=='제목'">title like '%' || #{key} || '%'</when>
+			<when test="conten=='저자'">author like '%' || #{key} || '%'</when>
+			<when test="conten=='내용'">contents like '%' || #{key} || '%'</when>
+		</choose>   
+	</select>
+
+	<update id="complete" parameterType="org.kdea.manager.ManagerVO">
+		UPDATE report SET
+		complete='처리완료' where num=#{num}
+	</update>
+	
+		
+	<select id="getUser" resultType="org.kdea.manager.ManagerVO">
+		SELECT * FROM members WHERE active=1 and id=#{id} 
+	</select>
+	
+	
+	
+	
+</mapper>

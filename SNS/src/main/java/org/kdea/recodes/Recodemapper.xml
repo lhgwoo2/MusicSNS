@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.recodes.RecodeDAO">
+
+	<select id="search" resultType="org.kdea.recodes.RecodeVO" parameterType="org.kdea.recodes.RecodeVO"> <!--최신순  -->
+
+	select *
+	from 
+	(
+	  select rf.*,TRUNC((rownum-1)/3)+1 as page
+	  from
+	  (
+	        select r.*,b.markid
+	        from
+	        (
+	          select re.*,f.filename,m.PROFILFILE as proFilFileName
+	          from recodes re join members m
+	          on re.AUTHOR=m.ID
+	          join recodesfiles f
+	          on re.num=f.num
+	          where re.active=1
+	        )r
+	        left outer join
+	        (
+	          select *
+	          from RECODESBOOKMARK
+	          where markid=#{author}
+	        )b 
+	        on r.num=b.marknum
+	        order by r.regdate desc 
+	  )rf
+	)
+	where page = #{page}
+
+	</select>
+			
+
+	<select id="search2" resultType="org.kdea.recodes.RecodeVO" parameterType="org.kdea.recodes.RecodeVO"> <!--인기순-->
+
+	select *
+	from 
+	(
+	  select rf.*,TRUNC((rownum-1)/3)+1 as page
+	  from
+	  (
+	        select r.*,b.markid
+	        from
+	        (
+	          select re.*,f.filename,m.PROFILFILE as proFilFileName
+	          from recodes re join members m
+	          on re.AUTHOR=m.ID
+	          join recodesfiles f
+	          on re.num=f.num
+	          where re.active=1
+	        )r
+	        left outer join
+	        (
+	          select *
+	          from RECODESBOOKMARK
+	          where markid=#{author}
+	        )b 
+	        on r.num=b.marknum
+	        order by r.likes desc 
+	  )rf
+	)
+	where page = #{page}
+		
+	</select>	
+	
+	<insert id="recodeUpload2" parameterType="org.kdea.recodes.RecodeVO">
+		insert into RECODES
+		(NUM,TITLE,AUTHOR,REGDATE,GENRE,CONTENTS,ACTIVE,likes) VALUES
+		(RECODES_NUM_SEQ.NEXTVAL,#{title},#{author},sysdate,#{genre},#{contents},1,0)
+	</insert>
+
+	<insert id="recodeUpload" parameterType="org.kdea.recodes.RecodeVO">
+		insert into RECODESFILES
+		(NUM,FILESIZE,EXT,FILENAME,REGDATE) VALUES
+		(RECODESFILES_NUM_SEQ.NEXTVAL,#{filesize},#{ext},RECODESFILES_FILENAME_SEQ.NEXTVAL||'.'||#{ext},sysdate)
+	</insert>
+	
+	<select id="getFilename" resultType="org.kdea.recodes.RecodeVO" parameterType="String">
+		select filename
+		from RECODESFILES
+		where num =
+		(
+			select MAX(f.num) as maxnum
+			from recodes r inner join recodesfiles f
+			on r.num = f.num
+			where r.author= #{author}
+		)
+	</select>
+
+	<select id="max" resultType="Integer">
+		select CEIL(count(*)/3) from RECODES where active=1
+	</select>
+
+	<select id="recodeDesc" resultType="org.kdea.recodes.RecodeVO">
+		select * from recodes r inner
+		join recodesfiles f on r.num=f.num where r.num=#{num} and r.active=1
+	</select>
+
+	<update id="recodeUpdate" parameterType="org.kdea.recodes.RecodeVO"> <!-- recodes수정 -->
+		update recodes set title=#{title}, contents=#{contents},
+		regDate=sysdate where num=#{num}
+	</update>
+
+	<update id="recodeFileUpdate" parameterType="org.kdea.recodes.RecodeVO"> <!-- recodesfiles수정 -->
+		update recodesfiles set
+		filename= RECODESFILES_FILENAME_SEQ.NEXTVAL||'.'||#{ext}, filesize=#{filesize},ext=#{ext},regDate=sysdate
+		where num=#{num}
+	</update>
+
+	<select id="getfilename2" resultType="org.kdea.recodes.RecodeVO">
+		select filename
+		from recodesfiles
+		where num = #{num}
+	</select>
+
+	<update id="delete" parameterType="org.kdea.recodes.RecodeVO">
+		update recodes set active=0 where num=#{num}
+	</update>
+	
+	<!-- 북마크 삭제 (파일이 삭제되면 북마크도 삭제)-->
+	<delete id="deleteRecodeBookmark" parameterType="org.kdea.recodes.RecodeVO">
+		delete from RECODESBOOKMARK where marknum=#{num}
+	</delete>
+	
+		<!-- 북마크  -->
+	<insert id="mark"  parameterType="org.kdea.recodes.RecodeVO">
+		<!-- 내용 변경할것!! -->
+		INSERT INTO RECODESBOOKMARK(marknum,markid)
+		VALUES(#{num},#{author})
+	</insert>
+	
+	<!-- 북마크 해제하기  -->
+	<delete id="markCancel" parameterType="org.kdea.recodes.RecodeVO">
+		delete from RECODESBOOKMARK where markid=#{author} and marknum=#{num}
+	</delete>
+	
+	<!-- 좋아요 수 증가  -->
+	<update id="likes" parameterType="org.kdea.recodes.RecodeVO">
+		UPDATE recodes SET likes=likes+1
+		WHERE num=#{num}
+	</update>
+	
+	<!-- 좋아요 수 감소  -->
+	<update id="likes_" parameterType="org.kdea.recodes.RecodeVO">
+		UPDATE recodes SET likes=likes-1
+		WHERE num=#{num}
+	</update>
+	
+	
+	
+	<!-- 12월12일 통합 -->
+	<!-- 댓글 처음 가져오기 -->
+   <select id="getComment" parameterType="org.kdea.recodes.RecodeVO" resultType="org.kdea.recodes.RecodeVO">
+	WITH t1(num,author, contents, regdate,  ref, lvl, commentref,totalcomment )AS 
+	( 
+  SELECT num, author, contents, regdate, ref, 0 AS lvl, commentref, (SELECT COUNT(*) FROM recodescomment where active=1 and ref=#{num}) as totalcomment  FROM recodescomment WHERE commentref = 0 and active=1 and ref=#{num}
+  UNION ALL 
+  SELECT b.num, b.author, b.contents, b.regdate, b.ref, t1.lvl+1 AS lvl, b.commentref, (SELECT COUNT(*) FROM recodescomment where active=1 and ref=#{num}) as totalcomment  
+  FROM recodescomment b JOIN t1 ON b.COMMENTREF = t1.num where b.active=1 and b.ref=#{num}
+  ) 
+  SEARCH DEPTH FIRST BY num SET ordering 
+  SELECT * FROM 
+  (
+    SELECT num, contents,author, regdate, commentref, filename,TRUNC((ROWNUM-1)/10)+1 AS page FROM 
+    (
+      SELECT t.num num, t.contents AS contents, LPAD('└Re:', lvl*4, '　')||t.author author, t.regdate regdate, t.ref ref, t.commentref commentref, t.totalcomment totalcomment, m.PROFILFILE filename 
+      FROM t1 t inner join members m on t.author=m.id 
+    ) START WITH commentref=0 CONNECT BY PRIOR num=commentref ORDER SIBLINGS BY regdate desc
+  )WHERE page=#{page}
+   </select>
+   
+   
+   <!--  댓글 저장 -->
+   <insert id="setComment" parameterType="org.kdea.recodes.RecodeVO">
+ 	insert into recodescomment(num, ref, author, contents, regdate, active, commentref) values(recodescomment_seq.NEXTVAL, #{ref}, #{author}, #{contents}, sysdate, 1, #{commentref})
+   </insert>
+   
+   <!-- 댓글가져오기 -->
+    <select id="getOnecomment" resultType="org.kdea.recodes.RecodeVO">
+    select  t.num num, t.contents AS contents, t.author author, t.regdate regdate, t.ref ref, t.commentref commentref, m.PROFILFILE filename from(select * from recodescomment where num=(select max(num) from recodescomment)) t inner join members m on t.author=m.id
+    </select>
+	
+	
+	
+	
+	<!-- 12월 13일 추가 -->
+	<!-- 유저정보 가져오기 -->
+	<select id="getUser" resultType="org.kdea.recodes.RecodeVO">
+    select profilfile as proFilFileName from members where id=#{id}
+    </select>
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+</mapper>

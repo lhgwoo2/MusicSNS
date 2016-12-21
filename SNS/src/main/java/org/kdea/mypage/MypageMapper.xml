@@ -1,0 +1,385 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.mypage.MypageDAO"> <!--이 sql 문장과 매핑될 인터페이스의 완전한 경로 -->
+   
+   <!-- 비디오 북마크 -->
+   <select id="getBookmarkVideoList" resultType="org.kdea.video.VideoVO">
+  select * from
+  (
+    select pf.*,b.*, TRUNC((ROWNUM-1)/3)+1 AS page
+    from
+    (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM video v join videobookmark m on v.num=m.marknum 
+      where v.active=1 and m.markid=#{id}
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and v.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and v.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      ) totalRows 
+      FROM 
+      (
+        select pm.*,m.profilfile as proFilFileName
+        from video pm join members m
+        on pm.author = m.id where pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join videofiles f 
+      on p.num=f.num 
+      where p.active=1 
+      order by p.num desc
+      )pf
+      inner join
+      (
+        select *
+        from videobookmark
+        where markid=#{id}
+      )b
+    on pf.num = b.marknum order by pf.regdate desc
+  )WHERE page=#{page}
+   </select>
+   
+   
+   <!-- 녹음 북마크 -->
+   <select id="getBookmarkRecodeList" resultType="org.kdea.recodes.RecodeVO">
+  select * from
+  (
+    select pf.*,b.*, TRUNC((ROWNUM-1)/6)+1 AS page
+    from
+    (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM recodes r join recodesbookmark m on r.num=m.marknum 
+      where r.active=1 and m.markid=#{id}
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and r.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and r.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      ) totalRows 
+      FROM 
+      (
+        select pm.*,m.profilfile as proFilFileName
+        from recodes pm join members m
+        on pm.author = m.id where pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join recodesfiles f 
+      on p.num=f.num 
+      where p.active=1 
+      order by p.num desc
+      )pf
+      inner join
+      (
+        select *
+        from RECODESBOOKMARK
+        where markid=#{id}
+      )b
+    on pf.num = b.marknum order by pf.regdate desc
+  )WHERE page=#{page}
+   </select>
+   
+   
+   
+   <!--홍보 북마크  -->
+<select id="getBookmarkPromotion" resultType="org.kdea.promotion.PromotionVO" >
+  select * from
+  (
+    select pf.*,b.*, TRUNC((ROWNUM-1)/6)+1 AS page
+    from
+    (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM promotion pro join promotionbookmark ma on pro.num=ma.marknum 
+      where pro.active=1 and ma.markid=#{id}
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pro.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pro.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      ) totalRows 
+      FROM 
+      (
+        select pm.*,m.profilfile as proFilFileName
+        from promotion pm join members m
+        on pm.author = m.id  where pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join promotionfiles f 
+      on p.num=f.num 
+      where p.active=1 
+      order by p.num desc
+      )pf
+      inner join
+      (
+        select *
+        from promotionbookmark
+        where markid=#{id}
+      )b
+    on pf.num = b.marknum order by pf.regdate desc
+  )WHERE page=#{page}
+  </select>
+  
+  <!-- 내정보 보기  -->
+     <select id="info" resultType="org.kdea.members.MemberVO" parameterType="String">
+      select
+      num,id,pwd,email,birth,gender,myregion,active,profilfile as proFilFileName,authority from members where id=#{id}
+   </select>
+   <select id="info2" resultType="org.kdea.members.MemberVO">
+      select 
+      num,id,pwd,email,birth,gender,myregion,active,profilfile as proFilFileName,authority from members where num=#{num}
+   </select>
+   
+   <!-- 내정보 수정  -->
+   
+   <update id="update" parameterType="org.kdea.members.MemberVO">
+      update members set email=#{email},myregion=#{myregion},profilfile=MEMBERS_PROFILFILE_SEQ.NEXTVAL||'.'||#{ext}
+      where id=#{id}
+   </update>
+   <select id="getProfilfilename" resultType="org.kdea.members.MemberVO">
+      select profilfile as proFilFileName
+      from members
+      where id = #{id}
+   </select>
+   
+   <!-- 비밀번호 변경 -->
+   <select id="pwdCheck" resultType="String">
+      select pwd from members where id=#{id}
+   </select>
+   <update id="pwdUpate" parameterType="org.kdea.members.MemberVO">
+      update members set pwd=#{pwd} where id=#{id}
+   </update>
+   
+   <!-- 회원탈퇴 -->
+   <update id="deleteAccount" parameterType="org.kdea.members.MemberVO">
+      update members set active=0 where id=#{id} and pwd=#{pwd} and active=1
+   </update>
+   
+   <!-- 내가 올린 비디오 -->
+   <select id="getMyLoadVideoList" resultType="org.kdea.video.VideoVO" >
+      select * from
+      (
+      select pf.*, TRUNC((ROWNUM-1)/3)+1 AS page
+      from
+      (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM video  where author=#{author} and active =1
+      
+           <if test="type != null">
+              <choose>
+                 <when test="type == 'title'">
+                  and  title like '%'||#{key}||'%' 
+                 </when>
+                 <when test="type == 'author'">
+                  and  author like '%'||#{key}||'%' 
+                 </when>
+              </choose>
+           </if>
+     )totalRows
+      FROM
+      (
+      select pm.*,m.profilfile as proFilFileName
+      from video pm join members m
+      on pm.author = m.id
+      where pm.author=#{author} and pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join videofiles f
+      on p.num=f.num
+      where p.active=1
+      order by p.num desc
+      )pf
+      order by pf.regdate desc
+      )WHERE page=#{page}
+
+   </select>
+   
+   <!-- 내가올린오디오 -->
+   <select id="getMyLoadAudioList" resultType="org.kdea.recodes.RecodeVO" >
+      select * from
+      (
+      select pf.*, TRUNC((ROWNUM-1)/3)+1 AS page
+      from
+      (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM recodes  where author=#{author} and active =1
+
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+             and title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+             and author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+
+     )totalRows
+      FROM
+      (
+      select pm.*,m.profilfile as proFilFileName
+      from recodes pm join members m
+      on pm.author = m.id
+      where pm.author=#{author} and pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join recodesfiles f
+      on p.num=f.num
+      where p.active=1
+      order by p.num desc
+      )pf
+      order by pf.regDate desc
+      )WHERE page=#{page}
+
+   </select>
+   
+      <!-- 내가올린홍보 -->
+   <select id="getMyLoadPromotionList" resultType="org.kdea.promotion.PromotionVO" >
+      select * from
+      (
+      select pf.*, TRUNC((ROWNUM-1)/3)+1 AS page
+      from
+      (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM promotion  where author=#{author} and active =1
+
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+             and title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+             and author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+
+     )totalRows
+      FROM
+      (
+      select pm.*,m.profilfile as proFilFileName
+      from promotion pm join members m
+      on pm.author = m.id
+      where pm.author=#{author} and pm.active=1
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and pm.title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and pm.author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join promotionfiles f
+      on p.num=f.num
+      where p.active=1
+      order by p.num desc
+      ) pf
+      order by pf.regDate desc
+      )
+      WHERE page=#{page}
+
+   </select>
+
+
+   <!--   홍보북마크알림 -->
+  <select id="bookMarkAlarm" resultType="org.kdea.promotion.PromotionVO">
+   select *
+    from(
+          select p.*,(openingday-sysdate) as date_sub ,markid
+          from  promotionbookmark b
+          LEFT OUTER JOIN   promotion p
+          on b.marknum=p.num
+          where b.markid=#{author} and p.active=1
+        )
+     where rownum between 1 and 4 and date_sub>=0
+     order by openingday 
+  
+  </select>
+   
+   
+   
+  
+  
+  <!-- 녹음 정보 가져오기 --> 
+  <select id="getAudio" resultType="org.kdea.manager.ManagerVO">
+   select * from recodes where num=#{num} 
+  </select>
+    
+  <!-- 비디오 정보 가져오기 --> 
+  <select id="getVideo" resultType="org.kdea.manager.ManagerVO">
+   select * from video where num=#{num} 
+  </select>
+  
+  <!-- 홍보 정보 가져오기 --> 
+  <select id="getPromotion" resultType="org.kdea.manager.ManagerVO">
+   select * from promotion where num=#{num} 
+  </select>
+  
+  
+    <!-- 신고 -->
+  	<insert id="report"  parameterType="org.kdea.manager.ManagerVO">
+      insert into report(num,author,title,reporttype,reportnum,reportcontents,regdate,active,reportdate,reporter,complete) 
+        values(report_seq.NEXTVAL,#{author},#{title}, #{reporttype},#{num},#{reportcontents},sysdate,1,#{regdate},#{reporter},'처리 미완료')
+   </insert>
+    
+    
+</mapper>

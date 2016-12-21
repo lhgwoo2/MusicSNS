@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.members.MemberDAO"> <!--이 sql 문장과 매핑될 인터페이스의 완전한 경로 -->
+	<select id="login" resultType="org.kdea.members.MemberVO">
+		select * from members where id=#{id} and active=1
+	</select>
+
+	<select id="idCheck" resultType="String">
+		SELECT COUNT(*) CNT FROM members WHERE ID = #{id}
+	</select>
+    
+   	<insert id="add" parameterType="org.kdea.members.MemberVO">
+		insert into members (num,id,pwd,email,birth,gender,myregion,profilfile,active,Authority) 
+		values (MEMBERS_NUM_SEQ.NEXTVAL,#{id},#{pwd},#{email},#{birth},#{gender},#{myregion},MEMBERS_PROFILFILE_SEQ.NEXTVAL||'.'||#{proFilFileName},1,'MEMBER')
+	</insert>
+	
+	 <insert id="add2" parameterType="org.kdea.members.MemberVO">
+		insert into members (num,id,pwd,email,birth,gender,myregion,profilfile,active,Authority) 
+		values (MEMBERS_NUM_SEQ.NEXTVAL,#{id},#{pwd},#{email},#{birth},#{gender},#{myregion},#{proFilFileName},1,'MEMBER')
+	</insert>
+	
+	<select id="proffn" resultType="String">
+		SELECT profilfile
+		FROM members
+		WHERE ID = #{id}
+	</select>
+	
+	<!-- 아이디 찾기 -->
+	<select id="searchId" resultType="String" parameterType="org.kdea.members.MemberVO">
+		select id from members where email=#{email} and active=1
+	</select>
+	
+	<!--비밀번호찾기  -->
+	<select id="idExist" resultType="int">
+		select count(id) from members where id=#{id} and email=#{email}
+	</select>
+	
+	<!-- 새로운 비밀번호 삽입  -->
+	<update id="pwdUpate" parameterType="org.kdea.members.MemberVO">
+		update members set pwd=#{pwd} where id=#{id}
+	</update>
+	
+	<!--이메일 중복검사  -->
+	<select id="emailCheck" resultType="String">
+		select email from members where active=1 and email=#{email}
+	</select>
+	
+	
+    
+</mapper>

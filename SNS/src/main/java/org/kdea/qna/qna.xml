@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.qna.QnaDAO">
+
+	<select id="list" resultType="org.kdea.qna.QnaVO">
+		WITH t1(num,title,contents,author,regdate,hitcnt,ref,active,lvl,totalRows)
+		AS 
+		(
+		SELECT num,title,contents,author,regdate,hitcnt,ref,active, 0 AS lvl,(SELECT COUNT(*) FROM qna where active = 1) totalRows 
+		FROM qna 
+		WHERE ref=0 and active =1
+    	UNION ALL 
+		SELECT b.num,b.title,b.contents,b.author,b.regdate,b.hitcnt,b.ref,b.active,t1.lvl+1 AS lvl, t1.totalRows 
+		FROM qna b JOIN t1 
+		ON b.ref=t1.num 
+		where b.active = 1 
+		)
+		SEARCH DEPTH FIRST BY num desc SET ordering 
+		SELECT * FROM 
+		(
+		SELECT num, LPAD(' └',lvl*3,'　')||title AS title, regdate, author, ref, totalRows, TRUNC((ordering-1)/#{rpp})+1 AS page
+		FROM t1 
+		order by ordering 
+		)
+		WHERE page=#{page}
+	</select>
+
+	<select id="getBoard" resultType="org.kdea.qna.QnaVO">
+		SELECT num,title,contents,author FROM
+		qna WHERE num=
+		(
+		SELECT MAX(num) num FROM qna WHERE author=#{author}
+		)
+	</select>
+
+	<insert id="addBoard" parameterType="org.kdea.qna.QnaVO">
+		insert into qna
+		(num,title,contents,author,regdate,active,ref)
+		values(qna_num.nextval,#{title},#{contents},#{author},sysdate,1,#{ref})
+	</insert>
+
+	<select id="desc" resultType="org.kdea.qna.QnaVO">
+		select * from qna where num =#{num}
+	</select>
+
+	<update id="update" parameterType="org.kdea.qna.QnaVO">
+		UPDATE qna SET contents=#{contents} WHERE num=#{num}
+	</update>
+
+	<insert id="getComm" parameterType="org.kdea.qna.QnaVO">
+		INSERT INTO
+		qna(num,title,author,contents,regdate,hitcnt,ref,active)
+		values(qna_num.nextval,#{title},#{author},#{contents},sysdate,0,#{ref},1)
+	</insert>
+
+	<update id="delBoard" parameterType="org.kdea.qna.QnaVO">
+		UPDATE qna SET active=0 WHERE	num=#{num} and not exists(select * from(select * from qna where active=1) where ref=#{num})
+	</update>
+	
+	<select id="getSearch" resultType="org.kdea.qna.QnaVO">
+		SELECT * FROM qna WHERE active=1 
+		<choose>
+			<when test="conten=='제목'">and title like '%' || #{key} || '%'</when>
+			<when test="conten=='작성자'">and author like '%' || #{key} || '%'</when>
+		</choose>   
+	</select>
+	
+	
+	<select id="getUser" resultType="org.kdea.qna.QnaVO">
+		SELECT * FROM members WHERE active=1 and id=#{id} 
+	</select>
+	
+</mapper>

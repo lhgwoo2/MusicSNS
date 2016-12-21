@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.newspeed.NewsPeedDAO">
+
+	<select id="recodemax" resultType="Integer">
+		select CEIL(count(*)/1) from RECODES where active=1
+	</select>
+	
+	<select  id="videomax" resultType="Integer" > 
+		select CEIL(count(*)/1) from video where active=1 
+	</select>
+	
+	<select  id="promotionmax" resultType="Integer" > 
+		select CEIL(count(*)/1) from promotion where active=1 
+	</select>
+	
+	
+	<!-- 비디오 가져오기 -->
+	<select  id="getVideo" resultType="org.kdea.newspeed.NewsPeedVO"  parameterType="org.kdea.newspeed.NewsPeedVO"> 
+		SELECT vf.*,b.markid 
+		  from 
+		  (
+		    select v.*,f.filename,TRUNC((rownum-1)/1)+1 as page
+		    from 
+		    (
+		      select *
+		      from 
+          (
+            select vi.*,m.PROFILFILE as proFilFileName
+            from video vi join members m
+            on vi.AUTHOR=m.ID
+            where vi.active=1
+            order by vi.regdate desc
+          )
+		    )v join videofiles f
+		    on v.num=f.num 
+		  )vf
+		  left outer join
+		  (
+					select *
+					from videobookmark
+					where markid=#{author}
+		  )b 
+      on vf.num=b.marknum
+      WHERE vf.PAGE=#{page}
+      order by vf.num desc
+      
+	</select>
+	
+	<!-- 레코드 가져오기 -->
+	<select  id="getRecode" resultType="org.kdea.newspeed.NewsPeedVO" parameterType="org.kdea.newspeed.NewsPeedVO" > 
+	select *
+	from 
+	(
+	  select rf.*,TRUNC((rownum-1)/1)+1 as page
+	  from
+	  (
+	        select r.*,b.markid
+	        from
+	        (
+	          select re.*,f.filename,m.PROFILFILE as proFilFileName
+	          from recodes re join members m
+	          on re.AUTHOR=m.ID
+	          join recodesfiles f
+	          on re.num=f.num
+	          where re.active=1
+	        )r
+	        left outer join
+	        (
+	          select *
+	          from RECODESBOOKMARK
+	          where markid=#{author}
+	        )b 
+	        on r.num=b.marknum
+	        order by r.num desc 
+	  )rf
+	)
+	where page = #{page}
+	</select>
+	
+	<!-- 홍보 가져오기 -->
+	<select  id="getPromotion" resultType="org.kdea.newspeed.NewsPeedVO"  parameterType="org.kdea.newspeed.NewsPeedVO"> 
+		select *
+		from
+		(
+		  select num, author, likes, region, genre, filename, contents, title, regdate, openingday, profilfile, TRUNC((ROWNUM-1)/1)+1 AS page, totalRows,markid
+		  from 
+		  ( 
+		    select num, author, likes, region, genre, filename, contents, title, regdate, openingday, profilfile, totalRows,markid
+		    from
+		    (
+		      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM promotion) totalRows 
+		      FROM 
+		      (
+		        select pm.*,m.profilfile
+		        from promotion pm join members m
+		        on pm.author = m.id
+		        where pm.active=1 
+		        order by pm.num desc  
+		      )p
+		      left outer join promotionfiles f 
+		      on p.num=f.num 
+		      where p.active=1 
+		    )pf
+		    left outer join
+		    (
+		      select *
+		      from promotionbookmark
+		      where markid=#{author}
+		    )b  
+		    on pf.num = b.marknum
+		    order by pf.num desc
+		  )
+		)
+		where page = #{page}
+	</select>
+	
+	
+	<!-- 북마크 -->
+	<insert id="videoMark"  parameterType="org.kdea.newspeed.NewsPeedVO">
+		INSERT INTO VIDEOBOOKMARK(marknum,markid)
+		VALUES(#{num},#{author})
+	</insert>
+	
+	<insert id="recodeMark"  parameterType="org.kdea.newspeed.NewsPeedVO">
+		INSERT INTO RECODESBOOKMARK(marknum,markid)
+		VALUES(#{num},#{author})
+	</insert>
+	
+	<insert id="promotionMark"  parameterType="org.kdea.newspeed.NewsPeedVO">
+		insert into promotionbookmark values(#{num}, #{author})
+	</insert>
+	
+	<update id="videoLikes" parameterType="Integer">
+		UPDATE VIDEO SET likes=likes+1
+		WHERE num=#{num}
+	</update>
+	
+	<update id="recodeLikes" parameterType="Integer">
+		UPDATE recodes SET likes=likes+1
+		WHERE num=#{num}
+	</update>
+	
+	<update id="promotionLikes" parameterType="Integer">
+		update promotion set likes=likes+1 where num=#{num} 
+	</update>
+	
+	<!-- 북마크 취소 -->
+	<delete id="videoMarkCancel" parameterType="org.kdea.newspeed.NewsPeedVO">
+		delete from VIDEOBOOKMARK where markid=#{author} and marknum=#{num}
+	</delete>
+	<update id="videoLikes_" parameterType="Integer">
+		UPDATE VIDEO SET likes=likes-1
+		WHERE num=#{num}
+	</update>
+	
+	<delete id="recodeMarkCancel" parameterType="org.kdea.newspeed.NewsPeedVO">
+		delete from RECODESBOOKMARK where markid=#{author} and marknum=#{num}
+	</delete>
+	<update id="recodelikes_" parameterType="Integer">
+		UPDATE recodes SET likes=likes-1
+		WHERE num=#{num}
+	</update>
+
+	<delete id="promotionMarkCancel" parameterType="org.kdea.newspeed.NewsPeedVO">
+		delete from promotionbookmark where marknum=#{num} and markid=#{author}
+	</delete>
+	<update id="promotionLikes_" parameterType="Integer">
+		update promotion set likes=likes-1 where num=#{num}
+	</update>
+	
+	
+	
+	<!-- 12월 13일 추가 -->
+	<!-- 유저정보 가져오기 -->
+	<select id="getUser" resultType="org.kdea.newspeed.NewsPeedVO" > 
+		select * from members where id=#{id} 
+	</select>
+	
+	
+	
+	
+	
+	<insert id="reportVideo"  parameterType="org.kdea.manager.ManagerVO">
+      insert into report(num,author,title,reporttype,reportnum,reportcontents,regdate,active,reportdate,reporter,complete) 
+        values(report_seq.nextval,#{author},#{title}, #{reporttype},#{num},#{reportcontents},sysdate,1,#{regdate},#{reporter},'처리 미완료')
+   </insert>
+
+</mapper>

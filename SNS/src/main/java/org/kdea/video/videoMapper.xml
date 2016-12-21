@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.video.VideoDAO">
+
+
+
+	<select parameterType="org.kdea.video.VideoVO" resultType="org.kdea.video.VideoVO" id="search">
+
+	select *
+	from 
+	(
+	  select vf.*,TRUNC((rownum-1)/3)+1 as page
+	  from
+	  (
+	        select v.*,b.markid
+	        from
+	        (
+	          select vi.*,f.filename,m.PROFILFILE as proFilFileName
+	          from video vi join members m
+	          on vi.AUTHOR=m.ID
+	          join videofiles f
+	          on vi.num=f.num
+	          where vi.active=1
+	        )v
+	        left outer join
+	        (
+	          select *
+	          from videoBOOKMARK
+	          where markid=#{author}
+	        )b 
+	        on v.num=b.marknum
+	        order by v.regdate desc 
+	  )vf
+	)
+	where page = #{page}
+      
+	</select>
+	
+	<select parameterType="org.kdea.video.VideoVO" resultType="org.kdea.video.VideoVO" id="search2">
+	select *
+	from 
+	(
+	  select vf.*,TRUNC((rownum-1)/3)+1 as page
+	  from
+	  (
+	        select v.*,b.markid
+	        from
+	        (
+	          select vi.*,f.filename,m.PROFILFILE as proFilFileName
+	          from video vi join members m
+	          on vi.AUTHOR=m.ID
+	          join videofiles f
+	          on vi.num=f.num
+	          where vi.active=1
+	        )v
+	        left outer join
+	        (
+	          select *
+	          from videoBOOKMARK
+	          where markid=#{author}
+	        )b 
+	        on v.num=b.marknum
+	        order by v.likes desc 
+	  )vf
+	)
+	where page = #{page}
+	</select>
+	
+	<select resultType="Integer" id="max"> 
+		select CEIL(count(*)/1) from video where active=1 
+	</select>
+	
+	<!-- 게시물 삭제  -->
+	<update id="del" parameterType="org.kdea.video.VideoVO">
+		UPDATE video SET active=0
+		WHERE num=#{num}
+	</update>
+	
+	<!-- 비디오 북마크 삭제(파일이 삭제되면 함께 삭제) -->
+	<delete id="delVideoBookmark" parameterType="org.kdea.video.VideoVO">
+	delete from videobookmark where marknum=#{num}
+	</delete>
+
+
+	<insert id="videoUpload"  parameterType="org.kdea.video.VideoVO">
+		<!-- 내용 변경할것!! -->
+		INSERT INTO VIDEO(num,author,title,contents,genre,regdate,active,likes)
+		VALUES(VIDEO_NUM_SEQ.NEXTVAL,#{author},#{title},#{contents},'5',sysdate,1,0)
+	</insert>
+
+	<insert id="videoUpload2" parameterType="org.kdea.video.VideoVO">
+		<!-- 내용 변경할것!! -->
+		INSERT INTO
+		VIDEOFILES(num,filesize,ext,filename,regdate)
+		VALUES(VIDEOFILES_NUM_SEQ.NEXTVAL,#{filesize},#{ext},VIDEOFILES_FILENAME_SEQ.NEXTVAL||'.'||#{ext},sysdate)
+	</insert>
+
+	<select id="getFilename" resultType="org.kdea.video.VideoVO" parameterType="String">
+		select filename
+		from VIDEOFILES
+		where num =
+		(
+			select MAX(f.num) as maxnum
+			from VIDEO v inner join VIDEOFILES f
+			on v.num = f.num
+			where v.author= #{author}
+		)
+	</select>
+	
+	<!-- 게시물 수정 -->
+	<select id="videoDesc" resultType="org.kdea.video.VideoVO" parameterType="Integer">
+		select *
+		from VIDEO v inner join VIDEOFILES f
+		on v.num=f.num
+		where v.num= #{num}
+		and v.active=1
+	</select>
+	
+	<update id="videoUpdate" parameterType="org.kdea.video.VideoVO">
+		UPDATE video SET title=#{title}, contents=#{contents},regDate=sysdate
+		WHERE num=#{num}
+	</update>
+
+	<update id="videoUpdate2" parameterType="org.kdea.video.VideoVO">
+		UPDATE VIDEOFILES SET filename=VIDEOFILES_FILENAME_SEQ.NEXTVAL||'.'||#{ext}, filesize=#{filesize},ext=#{ext},regDate=sysdate
+		WHERE num=#{num}
+	</update>
+
+	<select id="getUpdateFilename" resultType="org.kdea.video.VideoVO" parameterType="Integer">
+		SELECT filename
+		FROM VIDEOFILES
+		WHERE num=#{num}
+	</select>
+	
+	<!-- 북마크  -->
+	<insert id="mark"  parameterType="org.kdea.video.VideoVO">
+		<!-- 내용 변경할것!! -->
+		INSERT INTO VIDEOBOOKMARK(marknum,markid)
+		VALUES(#{num},#{author})
+	</insert>
+	
+	<!-- 북마크 해제하기  -->
+	<delete id="markCancel" parameterType="org.kdea.video.VideoVO">
+		delete from VIDEOBOOKMARK where markid=#{author} and marknum=#{num}
+	</delete>
+	
+	<!-- 좋아요 수 증가  -->
+	<update id="likes" parameterType="org.kdea.video.VideoVO">
+		UPDATE VIDEO SET likes=likes+1
+		WHERE num=#{num}
+	</update>
+	
+	<!-- 좋아요 수 감소  -->
+	<update id="likes_" parameterType="org.kdea.video.VideoVO">
+		UPDATE VIDEO SET likes=likes-1
+		WHERE num=#{num}
+	</update>
+ 
+ 
+ 
+ 
+ <!-- 12월12일 통합 -->
+	<!-- 댓글 처음 가져오기 -->
+   <select id="getComment" parameterType="org.kdea.video.VideoVO" resultType="org.kdea.video.VideoVO">
+	WITH t1(num,author, contents, regdate,  ref, lvl, commentref,totalcomment )AS 
+	( 
+  SELECT num, author, contents, regdate, ref, 0 AS lvl, commentref, (SELECT COUNT(*) FROM videocomment where active=1 and ref=#{num}) as totalcomment  FROM videocomment WHERE commentref = 0 and active=1 and ref=#{num}
+  UNION ALL 
+  SELECT b.num, b.author, b.contents, b.regdate, b.ref, t1.lvl+1 AS lvl, b.commentref, (SELECT COUNT(*) FROM videocomment where active=1 and ref=#{num}) as totalcomment  
+  FROM videocomment b JOIN t1 ON b.COMMENTREF = t1.num where b.active=1 and b.ref=#{num}
+  ) 
+  SEARCH DEPTH FIRST BY num SET ordering 
+  SELECT * FROM 
+  (
+    SELECT num, contents,author, regdate, commentref, filename,TRUNC((ROWNUM-1)/10)+1 AS page FROM 
+    (
+      SELECT t.num num, t.contents AS contents, LPAD('└Re:', lvl*4, '　')||t.author author, t.regdate regdate, t.ref ref, t.commentref commentref, t.totalcomment totalcomment, m.PROFILFILE filename 
+      FROM t1 t inner join members m on t.author=m.id 
+    ) START WITH commentref=0 CONNECT BY PRIOR num=commentref ORDER SIBLINGS BY regdate desc
+  )WHERE page=#{page}
+   </select>
+   
+   
+   <!--  댓글 저장 -->
+   <insert id="setComment" parameterType="org.kdea.video.VideoVO">
+ 	insert into videocomment(num, ref, author, contents, regdate, active, commentref) values(videocomment_seq.NEXTVAL, #{ref}, #{author}, #{contents}, sysdate, 1, #{commentref})
+   </insert>
+   
+   <!-- 댓글가져오기 -->
+    <select id="getOnecomment" resultType="org.kdea.video.VideoVO">
+    select  t.num num, t.contents AS contents, t.author author, t.regdate regdate, t.ref ref, t.commentref commentref, m.PROFILFILE filename from(select * from videocomment where num=(select max(num) from videocomment)) t inner join members m on t.author=m.id
+    </select>
+	
+	
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ <!--  12월 13일 추가 -->
+ <!--  유저정보 추가하기 -->
+   <select id="getUser" resultType="org.kdea.video.VideoVO">
+    select profilfile as proFilFileName from members where id=#{id}
+   </select>
+ 
+ 
+ 
+ 
+ 
+ 
+	
+</mapper>

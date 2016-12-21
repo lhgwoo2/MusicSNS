@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.kdea.promotion.PromotionDAO">
+    
+  <select id="getPromotion" resultType="org.kdea.promotion.PromotionVO" >
+   select * 
+  from
+  (
+    select num, author, region, genre, filename, contents, title, regdate, openingday,profilfile, TRUNC((ROWNUM-1)/6)+1 AS page, totalRows,markid
+    from
+    (
+      SELECT p.*, f.filename filename,(SELECT COUNT(*) FROM promotion where active=1 
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>) totalRows 
+      FROM 
+      (
+        select pm.*,m.profilfile
+        from promotion pm join members m
+        on pm.author = m.id where pm.active=1 
+        <if test="type != null">
+        <choose>
+           <when test="type == 'title'">
+              and title like '%'||#{key}||'%'
+           </when>
+           <when test="type == 'author'">
+              and author like '%'||#{key}||'%'
+           </when>
+        </choose>
+     </if>
+      )p
+      left outer join promotionfiles f 
+      on p.num=f.num 
+      where p.active=1 
+      order by p.num desc
+      )pf
+      left outer join
+      (
+        select *
+        from promotionbookmark
+        where markid=#{id}
+      )b
+    on pf.num = b.marknum order by pf.regdate desc
+  )WHERE page=#{page}
+  </select>
+  
+  
+   <select id="getDesc" parameterType="org.kdea.promotion.PromotionVO" resultType="org.kdea.promotion.PromotionVO">
+    select p.num num, p.author author, p.title title, p.contents contents, p.genre genre, p.regdate regDate, 
+    p.region region, p.detailregion detailRegion, f.filename filename, p.openingday openingday, p.endday endday, p.likes likes  
+    from promotion p 
+    left outer join promotionfiles f on p.num=f.num 
+    where p.num=#{num} and active=1
+   </select>
+   
+   <!-- 댓글 처음 가져오기 -->
+   <select id="getComment" parameterType="org.kdea.promotion.PromotionVO" resultType="org.kdea.promotion.PromotionVO">
+	WITH t1(num,author, contents, regdate, likes, ref, lvl, commentref,totalcomment )AS 
+	( 
+  SELECT num, author, contents, regdate, likes, ref, 0 AS lvl, commentref, (SELECT COUNT(*) FROM promotioncomment where active=1 and ref=#{num}) as totalcomment  FROM PROMOTIONCOMMENT WHERE commentref = 0 and active=1 and ref=#{num}
+  UNION ALL 
+  SELECT b.num, b.author, b.contents, b.regdate, b.likes, b.ref, t1.lvl+1 AS lvl, b.commentref, (SELECT COUNT(*) FROM promotioncomment where active=1 and ref=#{num}) as totalcomment  
+  FROM PROMOTIONCOMMENT b JOIN t1 ON b.COMMENTREF = t1.num where b.active=1 and b.ref=#{num}
+  ) 
+  SEARCH DEPTH FIRST BY num SET ordering 
+  SELECT * FROM 
+  (
+    SELECT num, contents,author, regdate, likes, commentref, filename,TRUNC((ROWNUM-1)/10)+1 AS page FROM 
+    (
+      SELECT t.num num, t.contents AS contents, LPAD('└Re:', lvl*4, '　')||t.author author, t.regdate regdate, t.likes likes, t.ref ref, t.commentref commentref, t.totalcomment totalcomment, m.PROFILFILE filename 
+      FROM t1 t inner join members m on t.author=m.id 
+    ) START WITH commentref=0 CONNECT BY PRIOR num=commentref ORDER SIBLINGS BY regdate desc
+  )WHERE page=#{page}
+   </select>
+   
+   
+   <!--  댓글 저장 -->
+   <insert id="setComment" parameterType="org.kdea.promotion.PromotionVO">
+ 	insert into promotioncomment(num,ref, author, contents, regdate, active, commentref) values(promotioncomment_seq.NEXTVAL, #{ref}, #{author}, #{contents}, sysdate, 1, #{commentref})
+   </insert>
+   
+   <!-- 댓글가져오기 -->
+    <select id="getOnecomment" resultType="org.kdea.promotion.PromotionVO">
+    select  t.num num, t.contents AS contents, t.author author, t.regdate regdate, t.likes likes, t.ref ref, t.commentref commentref, m.PROFILFILE filename from(select * from promotioncomment where num=(select max(num) from promotioncomment)) t inner join members m on t.author=m.id
+    </select>
+    
+  <select id="getEdit" resultType="org.kdea.promotion.PromotionVO" parameterType="org.kdea.promotion.PromotionVO">
+  	select * from promotion p inner join promotionfiles f on p.num=f.num where p.num=#{num}
+  </select>
+  
+  <insert id="savePromotion" parameterType="org.kdea.promotion.PromotionVO">
+       insert into promotion(num, author, title, contents, genre, regdate, region, openingday, active, endday, detailregion) values(promotion_seq.NEXTVAL, #{author}, #{title}, #{contents}, #{genre}, sysdate, #{region}, #{openingday}, 1, #{endday}, #{detailRegion})
+  </insert>
+  
+  <insert id="saveAttached" parameterType="org.kdea.promotion.PromotionVO">
+        insert into promotionfiles values(#{num}, #{filename}, sysdate)
+  </insert>
+  
+  <select id="getSeq" resultType="Integer" >
+       select max(num) from promotion
+  </select>
+  
+  <insert id="mark" parameterType="org.kdea.promotion.PromotionVO">
+	insert into promotionbookmark values(#{num}, #{author})
+  </insert>
+  
+  <delete id="markCancel" parameterType="org.kdea.promotion.PromotionVO">
+	delete from promotionbookmark where marknum=#{num} and markid=#{author}
+  </delete>
+  
+  <update id="likes" parameterType="Integer" >
+	update promotion set likes=likes+1 where num=#{num} 
+  </update>
+  
+  <update id="likes_" parameterType="Integer" >
+  	update promotion set likes=likes-1 where num=#{num} 
+  </update>
+  
+  
+  <update id="editPromotion" parameterType="org.kdea.promotion.PromotionVO" >
+  	update promotion set contents=#{contents}, genre=#{genre}, openingday=#{openingday}, endday=#{endday}, region=#{region}, detailregion=#{detailRegion}, regdate=sysdate  where num=#{num} 
+  </update>
+  
+  
+  
+  
+  <!-- 12월 8일 변경사항 -->
+  
+  <!--날짜로 검색-->
+  <select id="openingday" parameterType="org.kdea.promotion.PromotionVO" resultType="org.kdea.promotion.PromotionVO">
+    SELECT * FROM promotion where openingday=#{openingday}
+  </select>
+  
+  <!-- 장르로 검색 -->
+  <select id="searchGenre" parameterType="org.kdea.promotion.PromotionVO" resultType="org.kdea.promotion.PromotionVO">
+    SELECT * FROM promotion where genre=#{genre}
+  </select>
+    
+    
+    
+    
+    <!--12월 13일 추가 -->
+    <!-- 로그인된 유저정보 가져오기 -->
+    <select id="getUser" resultType="org.kdea.promotion.PromotionVO">
+    SELECT * FROM members where id=#{id}
+  </select>
+  
+    
+  <!-- 홍보게시물 삭제 -->  
+  <update id="deletePromotion" parameterType="org.kdea.promotion.PromotionVO" >
+  	update promotion set active=0  where num=#{num} 
+  </update>
+  
+  <!-- 홍보 북마크 삭제(파일이 삭제되면 함께 삭제) -->
+	<delete id="delVideoBookmark" parameterType="org.kdea.promotion.PromotionVO">
+	delete from promotionbookmark where marknum=#{num}
+	</delete>
+  
+    
+</mapper>
